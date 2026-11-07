@@ -7,9 +7,20 @@ Usage:
 """
 
 import sys
+import os
+import io
 import json
 import argparse
 from pathlib import Path
+
+# Ensure resilient console encoding across all OS platforms
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except AttributeError:
+        pass
+
 from eeg_engine.analyzer import process_eeg
 
 # ANSI color codes for terminal formatting
@@ -75,7 +86,7 @@ def run_analysis_cli(args):
 
     print_header("FORMAL INTERPRETATION")
     for para in clinical.get("interpretation_paragraphs", []):
-        print(f"• {para}")
+        print(f" - {para}")
 
     print_header("IMPRESSION")
     print(f"{BOLD}{clinical.get('impression')}{RESET}")
@@ -88,7 +99,7 @@ def run_analysis_cli(args):
         print(f"  - {diff}")
     print(f"{BOLD}Recommended Next Steps:{RESET}")
     for act in clinical.get("recommended_actions", []):
-        print(f"  → {act}")
+        print(f"  -> {act}")
 
     # Output files
     pdf_path = result.get("pdf_url", "").replace("/reports/", "reports/")
@@ -98,14 +109,14 @@ def run_analysis_cli(args):
         pdf_path = args.output
 
     print_header("EXPORTS")
-    print(f"{GREEN}✓ PDF Clinical Report saved to: {pdf_path}{RESET}")
+    print(f"{GREEN}[OK] PDF Clinical Report saved to: {pdf_path}{RESET}")
 
     if args.json:
         # Strip large raw waveform array for compact JSON save
         save_data = {k: v for k, v in result.items() if k != "waveforms"}
-        with open(args.json, "w") as f:
+        with open(args.json, "w", encoding="utf-8") as f:
             json.dump(save_data, f, indent=2)
-        print(f"{GREEN}✓ Structured Analysis JSON saved to: {args.json}{RESET}")
+        print(f"{GREEN}[OK] Structured Analysis JSON saved to: {args.json}{RESET}")
 
     print(f"\nProcessing completed in {result['elapsed_seconds']} seconds.\n")
 

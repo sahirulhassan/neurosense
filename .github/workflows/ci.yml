@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ master, main ]
 
+env:
+  PYTHONIOENCODING: "utf-8"
+
 jobs:
   test:
     name: Test Diagnostic Pipeline & 1-Page PDF
@@ -38,11 +41,4 @@ jobs:
       - name: Verify Strict 1-Page PDF Compliance
         shell: bash
         run: |
-          uv run python -c "
-          import glob, pypdf
-          pdf_files = glob.glob('reports/*.pdf')
-          assert len(pdf_files) > 0, 'No PDF report generated'
-          reader = pypdf.PdfReader(pdf_files[0])
-          print(f'Verified PDF page count: {len(reader.pages)}')
-          assert len(reader.pages) == 1, f'ReportLab PDF failed 1-page constraint: {len(reader.pages)} pages'
-          "
+          uv run python -c "import glob, pypdf; pdfs = glob.glob('reports/*.pdf'); assert pdfs, 'No PDF found'; r = pypdf.PdfReader(pdfs[0]); print(f'Page count: {len(r.pages)}'); assert len(r.pages) == 1, f'Expected 1 page, got {len(r.pages)}'"

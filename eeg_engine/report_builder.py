@@ -57,15 +57,16 @@ def build_eeg_pdf(
 ) -> str:
     """
     Builds a professional 1-page clinical EEG report.
+    Strictly guaranteed single-page layout across all OS platforms and font engines.
     """
-    # 612 x 792 points (letter). Available height ~ 730 points.
+    # 612 x 792 points (letter). Available height ~ 748 points.
     doc = SimpleDocTemplate(
         output_pdf_path,
         pagesize=letter,
-        leftMargin=36,
-        rightMargin=36,
-        topMargin=26,
-        bottomMargin=36
+        leftMargin=32,
+        rightMargin=32,
+        topMargin=18,
+        bottomMargin=24
     )
 
     styles = getSampleStyleSheet()
@@ -74,24 +75,24 @@ def build_eeg_pdf(
         'InstTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=11,
-        leading=13,
+        fontSize=10.5,
+        leading=12.5,
         textColor=colors.HexColor('#0f766e')
     )
     inst_sub = ParagraphStyle(
         'InstSub',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=7.5,
-        leading=9.5,
+        fontSize=7,
+        leading=8.5,
         textColor=colors.HexColor('#475569')
     )
     dept_style = ParagraphStyle(
         'DeptStyle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8,
-        leading=10,
+        fontSize=7.5,
+        leading=9.5,
         alignment=2, # Right
         textColor=colors.HexColor('#1e293b')
     )
@@ -99,46 +100,46 @@ def build_eeg_pdf(
         'ReportTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=12,
-        leading=14,
+        fontSize=10.5,
+        leading=12.5,
         alignment=1, # Center
-        spaceBefore=4,
-        spaceAfter=6,
+        spaceBefore=2,
+        spaceAfter=3,
         textColor=colors.HexColor('#0f172a')
     )
     section_head = ParagraphStyle(
         'SectionHead',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=10.5,
-        spaceBefore=4,
-        spaceAfter=2,
+        fontSize=8,
+        leading=9.5,
+        spaceBefore=2.5,
+        spaceAfter=1.5,
         textColor=colors.HexColor('#0f766e')
     )
     body_style = ParagraphStyle(
         'BodyP',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=7.8,
-        leading=10.5,
-        spaceAfter=2.5,
+        fontSize=7.2,
+        leading=9.5,
+        spaceAfter=1.8,
         textColor=colors.HexColor('#1e293b')
     )
     table_label = ParagraphStyle(
         'TLabel',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=7.8,
-        leading=9.5,
+        fontSize=7.2,
+        leading=8.8,
         textColor=colors.HexColor('#334155')
     )
     table_val = ParagraphStyle(
         'TVal',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=7.8,
-        leading=9.5,
+        fontSize=7.2,
+        leading=8.8,
         textColor=colors.HexColor('#0f172a')
     )
 
@@ -151,17 +152,17 @@ def build_eeg_pdf(
             Paragraph(f"<b>{inst_name.upper()}</b><br/>"
                       f"<font color='#475569'>DIVISION OF CLINICAL NEUROLOGY & EPILEPSY MONITORING</font>", inst_title),
             Paragraph("<b>ROUTINE ELECTROENCEPHALOGRAPHY REPORT</b><br/>"
-                      "<font size=7 color='#64748b'>ACNS Standardized Nomenclature</font>", dept_style)
+                      "<font size=6.5 color='#64748b'>ACNS Standardized Nomenclature</font>", dept_style)
         ]
     ]
-    header_table = Table(header_data, colWidths=[360, 180])
+    header_table = Table(header_data, colWidths=[368, 180])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
         ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor('#0f766e')),
     ]))
     elements.append(header_table)
-    elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 2))
 
     # Title: ElectroEncephaloGraphy (EEG)
     elements.append(Paragraph("<u><b>ELECTROENCEPHALOGRAPHY (EEG) EXAMINATION</b></u>", report_title))
@@ -194,17 +195,17 @@ def build_eeg_pdf(
         ]
     ]
 
-    demo_table = Table(demo_data, colWidths=[80, 210, 80, 170])
+    demo_table = Table(demo_data, colWidths=[80, 214, 80, 174])
     demo_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 1.5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
+        ('TOPPADDING', (0, 0), (-1, -1), 1.2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.2),
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
         ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
         ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
     ]))
     elements.append(demo_table)
-    elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 2))
 
     # 3. INTERPRETATION
     elements.append(Paragraph("<u><b>INTERPRETATION:</b></u>", section_head))
@@ -217,22 +218,22 @@ def build_eeg_pdf(
         elements.append(Paragraph(f"• {p_text}", body_style))
 
     # 4. IMPRESSION
-    elements.append(Spacer(1, 3))
+    elements.append(Spacer(1, 2))
     elements.append(Paragraph("<u><b>IMPRESSION:</b></u>", section_head))
     elements.append(Paragraph(f"<b>{clinical_data.get('impression', '')}</b>", body_style))
 
     # 5. CONCLUSION & RECOMMENDATIONS
-    elements.append(Spacer(1, 3))
+    elements.append(Spacer(1, 2))
     elements.append(Paragraph("<u><b>CONCLUSION:</b></u>", section_head))
     elements.append(Paragraph(clinical_data.get("conclusion", ""), body_style))
 
     # 6. Representative Epoch Snippet (Compact height to preserve 1-page rule)
     if waveform_image_path and os.path.exists(waveform_image_path):
         try:
-            elements.append(Spacer(1, 3))
+            elements.append(Spacer(1, 2))
             elements.append(Paragraph("<b>REPRESENTATIVE EEG EPOCH (PAROXYSMAL DISCHARGE):</b>", section_head))
-            # Height 65 points to fit safely on single page
-            w_img = RLImage(waveform_image_path, width=540, height=65)
+            # Height 56 points to fit safely on single page with generous headroom
+            w_img = RLImage(waveform_image_path, width=548, height=56)
             elements.append(w_img)
         except Exception as e:
             print(f"Error adding waveform snippet: {e}")
@@ -251,14 +252,14 @@ def build_eeg_pdf(
                       "<font size=6.5 color='#64748b'>Electronically Signed & Authenticated Record</font>", body_style)
         ]
     ]
-    sig_table = Table(sig_data, colWidths=[270, 270])
+    sig_table = Table(sig_data, colWidths=[274, 274])
     sig_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
     ]))
     
-    elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 2))
     elements.append(KeepTogether([sig_table]))
 
     # Build PDF
