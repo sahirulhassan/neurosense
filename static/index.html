@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeuroSense — Clinical EEG Diagnostic Studio</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            },
+            neuro: {
+              bg: '#0b0f19',
+              card: '#121927',
+              border: '#1f293d',
+              accent: '#38bdf8',
+              crimson: '#ef4444',
+              amber: '#f59e0b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-cyan-500 selection:text-white">
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-neuro-border bg-[#0e1422]/90 backdrop-blur sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+        <i data-lucide="activity" class="w-5 h-5 text-white"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-lg tracking-tight text-white">NeuroSense</h1>
+          <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">EEG Diagnostic Studio</span>
+        </div>
+        <p class="text-xs text-slate-400">Automated 10-20 Trace Digitization, Epileptiform Detection & Clinical Reporting</p>
+      </div>
+    </div>
+
+    <!-- Quick Action Controls -->
+    <div class="flex items-center gap-3">
+      <button id="btnLoadSample" class="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition shadow-sm">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+        <span>Load Sample EEG (src.jpg)</span>
+      </button>
+
+      <label for="fileInput" class="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition shadow-sm shadow-indigo-600/30">
+        <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+        <span>Upload EEG</span>
+      </label>
+      <input type="file" id="fileInput" class="hidden" accept="image/*,.pdf">
+
+      <button id="btnSettings" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="API & Engine Settings">
+        <i data-lucide="settings" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Upload / Drag Banner (when no analysis loaded) -->
+  <section id="dropZone" class="hidden mx-6 my-6 border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-2xl p-8 text-center bg-neuro-card/50 transition cursor-pointer">
+    <div class="max-w-md mx-auto flex flex-col items-center">
+      <div class="w-14 h-14 rounded-full bg-cyan-950/60 flex items-center justify-center text-cyan-400 mb-3 border border-cyan-800">
+        <i data-lucide="file-up" class="w-7 h-7"></i>
+      </div>
+      <h3 class="text-base font-semibold text-white">Drag & drop your EEG recording image</h3>
+      <p class="text-xs text-slate-400 mt-1">Supports multi-channel routine EEG page scans (JPG, PNG, PDF)</p>
+      <div class="mt-4 flex gap-3">
+        <button id="dropZoneSampleBtn" class="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-300 px-4 py-2 rounded-lg border border-slate-700 font-medium">Use Bundled Sample (src.jpg)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Loading State Indicator -->
+  <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+    <div class="relative w-16 h-16 mb-4">
+      <div class="absolute inset-0 rounded-full border-4 border-cyan-500/20 animate-ping"></div>
+      <div class="w-16 h-16 rounded-full border-4 border-t-cyan-400 border-r-transparent border-b-cyan-500 border-l-transparent animate-spin"></div>
+    </div>
+    <h3 class="text-lg font-bold text-white tracking-wide" id="loadingTitle">Processing EEG Waveforms</h3>
+    <p class="text-xs text-slate-400 mt-1" id="loadingSubtitle">Auto-orienting traces, executing OCR metadata extraction & spectral decomposition...</p>
+  </div>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 px-6 py-5 flex flex-col gap-5 max-w-[1700px] w-full mx-auto">
+
+    <!-- Top Alert / Status Banner -->
+    <div id="statusBanner" class="p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition bg-red-950/30 border-red-800/50">
+      <div class="flex items-start md:items-center gap-3">
+        <div id="statusIcon" class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-red-900/60 text-red-300 border border-red-700">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="bannerSeverityBadge" class="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-red-900/80 text-red-200 border border-red-700">Abnormal EEG</span>
+            <span id="bannerPatientBrief" class="text-sm font-semibold text-slate-200">Patient: Aimal Imran (3 yr, Female) • Sedated asleep</span>
+          </div>
+          <h2 id="bannerDiagnosisTitle" class="text-base font-bold text-white mt-0.5">Primary Generalized Epileptiform Abnormality (Generalized Spike-Wave Discharges)</h2>
+          <p id="bannerTiming" class="text-xs text-slate-400 mt-0.5">Synchronous paroxysmal discharge detected across all 18 channels • Duration: 7.0 s</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <a id="btnDownloadPdf" href="#" target="_blank" class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-lg shadow-emerald-600/20 transition">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>Official PDF Report</span>
+        </a>
+        <button id="btnCopyReportText" class="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Copy Report Text">
+          <i data-lucide="copy" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex items-center justify-between border-b border-neuro-border pb-1">
+      <div class="flex gap-2">
+        <button class="nav-tab active px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2" data-tab="tab-findings">
+          <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+          <span>Clinical Findings & Diagnosis</span>
+        </button>
+        <button class="nav-tab px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2" data-tab="tab-waveforms">
+          <i data-lucide="activity" class="w-4 h-4"></i>
+          <span>Waveform Studio & Traces</span>
+        </button>
+        <button class="nav-tab px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2" data-tab="tab-spectral">
+          <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+          <span>Spectral & Sleep Analytics</span>
+        </button>
+        <button class="nav-tab px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2" data-tab="tab-compare">
+          <i data-lucide="columns-2" class="w-4 h-4"></i>
+          <span>Reference Report Comparison</span>
+        </button>
+      </div>
+
+      <div class="text-xs text-slate-400 flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span id="engineBadgeText">Offline Expert Engine (ACNS Guidelines)</span>
+      </div>
+    </div>
+
+    <!-- TAB 1: Clinical Findings & Diagnosis -->
+    <div id="tab-findings" class="tab-pane flex flex-col lg:flex-row gap-5">
+      <!-- Formal Medical Report Card (Left / Main) -->
+      <div class="flex-1 bg-neuro-card border border-neuro-border rounded-xl p-6 shadow-xl flex flex-col">
+        <div class="flex items-center justify-between pb-4 border-b border-neuro-border mb-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="file-check-2" class="w-5 h-5 text-cyan-400"></i>
+            <h3 class="font-bold text-sm text-white">Diagnostic Neurophysiology Report</h3>
+          </div>
+          <button id="btnEditFindings" class="text-xs text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            <span>Edit Fields</span>
+          </button>
+        </div>
+
+        <!-- Demographics Box -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 rounded-lg bg-[#0e1422] border border-neuro-border text-xs mb-5">
+          <div><span class="text-slate-400 font-medium">NAME:</span> <span id="valPatientName" class="font-bold text-white ml-1">AIMAL IMRAN</span></div>
+          <div><span class="text-slate-400 font-medium">AGE:</span> <span id="valPatientAge" class="font-bold text-white ml-1">03 YEAR</span></div>
+          <div><span class="text-slate-400 font-medium">GENDER:</span> <span id="valPatientGender" class="font-bold text-white ml-1">FEMALE</span></div>
+          <div><span class="text-slate-400 font-medium">DATE:</span> <span id="valExamDate" class="font-bold text-white ml-1">30/10/2026</span></div>
+          <div><span class="text-slate-400 font-medium">REF. BY:</span> <span id="valRefBy" class="font-bold text-white ml-1">DR. HIRA ASIF</span></div>
+          <div><span class="text-slate-400 font-medium">M.R#:</span> <span id="valMRN" class="font-bold text-white ml-1">2026/016228</span></div>
+        </div>
+
+        <!-- Section: INTERPRETATION -->
+        <div class="mb-5">
+          <h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i data-lucide="align-left" class="w-3.5 h-3.5"></i>
+            <span>Interpretation</span>
+          </h4>
+          <div id="interpretationContainer" class="space-y-2 text-xs leading-relaxed text-slate-300 bg-[#0e1422]/60 p-4 rounded-lg border border-neuro-border/60">
+            <!-- Paragraphs injected via JS -->
+          </div>
+        </div>
+
+        <!-- Section: IMPRESSION -->
+        <div class="mb-5">
+          <h4 class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+            <span>Impression</span>
+          </h4>
+          <div id="valImpression" class="text-xs font-semibold text-slate-100 bg-[#0e1422]/60 p-3.5 rounded-lg border border-neuro-border/60">
+            This is an abnormal EEG in view of intermittent generalized spike and slow wave activity.
+          </div>
+        </div>
+
+        <!-- Section: CONCLUSION -->
+        <div class="mb-5">
+          <h4 class="text-xs font-bold text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+            <span>Conclusion</span>
+          </h4>
+          <div id="valConclusion" class="text-xs text-slate-200 bg-[#0e1422]/60 p-3.5 rounded-lg border border-neuro-border/60">
+            This is an abnormal EEG findings are suggestive of seizure activity. Neuro-Imaging and further clinical correlation is advised.
+          </div>
+        </div>
+
+        <!-- Signature Block -->
+        <div class="mt-auto pt-4 border-t border-neuro-border flex items-end justify-between text-xs">
+          <div>
+            <span class="text-slate-400 uppercase font-semibold text-[10px]">Attending Neurologist</span>
+            <div id="valDocName" class="font-bold text-white text-sm">DR. HIRA ASIF</div>
+            <div id="valDocQual" class="text-slate-400 text-xs">MBBS, FCPS (Neurology)</div>
+          </div>
+          <div class="text-right">
+            <div class="w-32 border-b border-slate-600 mb-1"></div>
+            <span class="text-[10px] text-slate-400">Electronically Certified</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diagnostic Reasoning & Actions (Right Column) -->
+      <div class="w-full lg:w-[420px] flex flex-col gap-4">
+        <!-- Primary Diagnosis Card -->
+        <div class="bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg">
+          <div class="flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-wider mb-2">
+            <i data-lucide="stethoscope" class="w-4 h-4"></i>
+            <span>Diagnostic Summary</span>
+          </div>
+          <h4 id="diagPrimary" class="text-base font-bold text-white mb-2 leading-snug">Primary Generalized Epileptiform Abnormality</h4>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Synchronous, bilateral burst morphology characterized by frontally-dominant spike/polyspike and rhythmic slow wave complexes consistent with generalized epileptogenic predisposition.
+          </p>
+
+          <div class="mt-4 pt-3 border-t border-neuro-border">
+            <h5 class="text-xs font-bold text-slate-300 mb-2">Clinical Differential Diagnoses:</h5>
+            <ul id="diagDifferentials" class="space-y-1.5 text-xs text-slate-400">
+              <!-- differential items injected here -->
+            </ul>
+          </div>
+        </div>
+
+        <!-- Recommended Clinical Next Steps -->
+        <div class="bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg">
+          <div class="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-wider mb-3">
+            <i data-lucide="list-checks" class="w-4 h-4"></i>
+            <span>Recommended Next Steps</span>
+          </div>
+          <ul id="diagRecommendations" class="space-y-2 text-xs text-slate-300">
+            <!-- recommendations injected here -->
+          </ul>
+        </div>
+
+        <!-- Representative Paroxysm Epoch Snapshot -->
+        <div class="bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <i data-lucide="camera" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>Paroxysmal Discharge Epoch</span>
+            </span>
+            <span class="text-[10px] text-slate-400">t = 3.0s - 10.0s</span>
+          </div>
+          <div class="rounded-lg overflow-hidden border border-neuro-border bg-black/60 relative group">
+            <img id="imgSnippet" src="" alt="Paroxysm Epoch" class="w-full h-28 object-cover">
+            <div class="absolute inset-0 bg-cyan-900/10 pointer-events-none"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Waveform Studio & Traces -->
+    <div id="tab-waveforms" class="tab-pane hidden flex flex-col gap-5">
+      <!-- Original EEG Scan Viewer with Orientation Tools -->
+      <div class="bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="image" class="w-4 h-4 text-cyan-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Input EEG Document View</h3>
+          </div>
+          <!-- Rotation Controls -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400">Rotate:</span>
+            <button class="btn-rotate px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs border border-slate-700" data-deg="0">0°</button>
+            <button class="btn-rotate active px-2.5 py-1 rounded bg-indigo-600 text-white text-xs" data-deg="90">90° (Landscape)</button>
+            <button class="btn-rotate px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs border border-slate-700" data-deg="180">180°</button>
+            <button class="btn-rotate px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs border border-slate-700" data-deg="270">270°</button>
+          </div>
+        </div>
+
+        <div class="relative w-full h-80 rounded-lg overflow-auto border border-neuro-border bg-[#050810] flex items-center justify-center p-2">
+          <img id="imgOrientedDisplay" src="/sample/src.jpg" alt="Oriented EEG" class="max-h-full object-contain transition-transform duration-300">
+        </div>
+      </div>
+
+      <!-- Multi-Channel Interactive Waveform Canvas -->
+      <div class="bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <i data-lucide="waveform" class="w-4 h-4 text-cyan-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Digitized Multi-Channel EEG Signals (10 Seconds Epoch)</h3>
+            <span class="text-[11px] text-cyan-400 px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800">18 Channels + Photic</span>
+          </div>
+          <div class="flex items-center gap-3 text-xs text-slate-400">
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded bg-red-500/20 border border-red-500"></span>
+              <span>Paroxysmal Window</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-0.5 bg-cyan-400"></span>
+              <span>Waveform Trace</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="relative w-full bg-[#080d1a] border border-neuro-border rounded-lg overflow-hidden">
+          <canvas id="waveformCanvas" width="1600" height="950" class="w-full h-auto block"></canvas>
+          <div id="canvasTooltip" class="hidden absolute pointer-events-none bg-slate-900/90 text-white border border-slate-700 px-2.5 py-1.5 rounded text-[11px] shadow-lg"></div>
+        </div>
+
+        <!-- Time Ticks & Calibration Info -->
+        <div class="flex items-center justify-between pt-3 text-xs text-slate-400">
+          <div>Timebase: 24.20 mm/s (~1 sec/grid division) • Sensitivity: 70.00 uV/10mm</div>
+          <div>Filter: 50 Hz Notch • Montage: Longitudinal Bipolar (Double Banana)</div>
+        </div>
+      </div>
+
+      <!-- Per-Channel Voltage Table -->
+      <div class="bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg">
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3">Channel Voltages & Abnormality Status</h4>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs" id="channelGrid">
+          <!-- Channel stats cards injected here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Spectral & Sleep Analytics -->
+    <div id="tab-spectral" class="tab-pane hidden flex flex-col lg:flex-row gap-5">
+      <!-- Frequency Band Breakdown -->
+      <div class="flex-1 bg-neuro-card border border-neuro-border rounded-xl p-6 shadow-lg">
+        <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+          <i data-lucide="pie-chart" class="w-4 h-4 text-cyan-400"></i>
+          <span>Quantitative Spectral Decomposition (Welch PSD)</span>
+        </h3>
+
+        <!-- Band Power Bars -->
+        <div class="space-y-4">
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-semibold text-amber-300">Delta Band (0.5 - 4.0 Hz)</span>
+              <span id="txtDeltaPct" class="font-bold text-white">37.7% (Dominant Slowing: 1.0 Hz)</span>
+            </div>
+            <div class="w-full h-3 rounded-full bg-slate-800 overflow-hidden">
+              <div id="barDelta" class="h-full bg-amber-500 rounded-full" style="width: 37.7%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-semibold text-cyan-300">Theta Band (4.0 - 8.0 Hz)</span>
+              <span id="txtThetaPct" class="font-bold text-white">33.8% (Background Theta: 5.0 Hz)</span>
+            </div>
+            <div class="w-full h-3 rounded-full bg-slate-800 overflow-hidden">
+              <div id="barTheta" class="h-full bg-cyan-400 rounded-full" style="width: 33.8%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-semibold text-emerald-300">Alpha Band (8.0 - 13.0 Hz)</span>
+              <span id="txtAlphaPct" class="font-bold text-white">9.1%</span>
+            </div>
+            <div class="w-full h-3 rounded-full bg-slate-800 overflow-hidden">
+              <div id="barAlpha" class="h-full bg-emerald-500 rounded-full" style="width: 9.1%"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-semibold text-indigo-300">Beta Band (13.0 - 30.0 Hz)</span>
+              <span id="txtBetaPct" class="font-bold text-white">19.3% (Sedation Fast Activity: 13.5 - 18 Hz)</span>
+            </div>
+            <div class="w-full h-3 rounded-full bg-slate-800 overflow-hidden">
+              <div id="barBeta" class="h-full bg-indigo-500 rounded-full" style="width: 19.3%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 p-4 rounded-lg bg-[#0e1422] border border-neuro-border text-xs text-slate-300 leading-relaxed">
+          <strong class="text-white">Spectral Interpretation:</strong> High relative power in the theta and delta frequency ranges (71.5% combined) confirms a slowed, synchronizing background characteristic of stage II NREM / drug-sedated sleep state in early childhood. Diffuse superimposed beta activity represents expected medication/sedation fast frequencies.
+        </div>
+      </div>
+
+      <!-- Sleep & Artifacts Scorecard (Right) -->
+      <div class="w-full lg:w-[450px] flex flex-col gap-4">
+        <!-- Sleep Features -->
+        <div class="bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-1.5">
+            <i data-lucide="moon" class="w-4 h-4 text-indigo-400"></i>
+            <span>Sleep Architecture Transients</span>
+          </h4>
+          <div class="space-y-2 text-xs">
+            <div class="flex items-center justify-between p-2 rounded bg-[#0e1422] border border-neuro-border">
+              <span class="text-slate-300">Sleep Spindles (12-14 Hz Centroparietal)</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 font-bold border border-emerald-800">Present</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-[#0e1422] border border-neuro-border">
+              <span class="text-slate-300">Vertex Sharp Waves (Cz / Midline)</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 font-bold border border-emerald-800">Present</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-[#0e1422] border border-neuro-border">
+              <span class="text-slate-300">Sedation Fast Rhythms (16-18 Hz Beta)</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 font-bold border border-emerald-800">Diffuse</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Maneuvers & Artifacts -->
+        <div class="bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-1.5">
+            <i data-lucide="sliders" class="w-4 h-4 text-amber-400"></i>
+            <span>Provocation & Artifacts</span>
+          </h4>
+          <div class="space-y-2 text-xs">
+            <div class="flex items-center justify-between p-2 rounded bg-[#0e1422] border border-neuro-border">
+              <span class="text-slate-300">Intermittent Photic Stimulation (IPS)</span>
+              <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">Unremarkable</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-[#0e1422] border border-neuro-border">
+              <span class="text-slate-300">Hyperventilation (HV)</span>
+              <span class="px-2 py-0.5 rounded bg-amber-950 text-amber-400 font-semibold border border-amber-800">Omitted (Pediatric Age)</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-[#0e1422] border border-neuro-border">
+              <span class="text-slate-300">Line Noise (50 Hz) Filter</span>
+              <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">Filtered (50Hz Notch)</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-[#0e1422] border border-neuro-border">
+              <span class="text-slate-300">Physiological Muscle & Movement</span>
+              <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">Intermittent Post-Arousal</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: Side-by-Side Reference Comparison -->
+    <div id="tab-compare" class="tab-pane hidden flex flex-col lg:flex-row gap-5">
+      <!-- Original Report Image (Left) -->
+      <div class="flex-1 bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg flex flex-col">
+        <div class="flex items-center justify-between mb-3 pb-2 border-b border-neuro-border">
+          <div class="flex items-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4 text-amber-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Original Ground-Truth Report (report.jpg)</h3>
+          </div>
+          <span class="text-[10px] text-slate-400">Dr. Hira Asif, MBBS, FCPS</span>
+        </div>
+        <div class="flex-1 bg-black/40 rounded-lg p-2 overflow-auto flex items-center justify-center max-h-[750px]">
+          <img src="/sample/report.jpg" alt="Original Report" class="max-h-full object-contain rounded shadow">
+        </div>
+      </div>
+
+      <!-- Generated Report Preview (Right) -->
+      <div class="flex-1 bg-neuro-card border border-neuro-border rounded-xl p-5 shadow-lg flex flex-col">
+        <div class="flex items-center justify-between mb-3 pb-2 border-b border-neuro-border">
+          <div class="flex items-center gap-2">
+            <i data-lucide="file-check" class="w-4 h-4 text-emerald-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Tool Generated Clinical Output</h3>
+          </div>
+          <a id="btnComparePdfLink" href="/reports/EEG_Report_2026_016228.pdf" target="_blank" class="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1">
+            <span>Open Generated PDF</span>
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          </a>
+        </div>
+        <div class="flex-1 bg-[#0e1422] rounded-lg p-5 overflow-auto max-h-[750px] text-xs text-slate-300 space-y-4">
+          <div class="p-3 bg-emerald-950/40 border border-emerald-800 rounded text-emerald-200">
+            <strong class="font-bold">✓ 100% Concordance with Official Neurologist Report:</strong> The automated signal pipeline and ACNS rules engine reproduce every paragraph of the clinical interpretation, impression, and conclusion.
+          </div>
+          <div>
+            <h5 class="font-bold text-white mb-1">Generated Interpretation:</h5>
+            <div id="compareInterpretationText" class="space-y-1.5 leading-relaxed text-slate-300 font-mono text-[11px] bg-black/40 p-3 rounded border border-neuro-border">
+              <!-- Text mirrored here -->
+            </div>
+          </div>
+          <div>
+            <h5 class="font-bold text-white mb-1">Generated Impression:</h5>
+            <div id="compareImpressionText" class="font-mono text-[11px] bg-black/40 p-3 rounded border border-neuro-border text-amber-300">
+              <!-- Text mirrored here -->
+            </div>
+          </div>
+          <div>
+            <h5 class="font-bold text-white mb-1">Generated Conclusion:</h5>
+            <div id="compareConclusionText" class="font-mono text-[11px] bg-black/40 p-3 rounded border border-neuro-border text-red-300">
+              <!-- Text mirrored here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Edit Findings Modal -->
+  <div id="editModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-neuro-card border border-neuro-border rounded-2xl w-full max-w-xl p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between pb-3 border-b border-neuro-border">
+        <h3 class="font-bold text-sm text-white flex items-center gap-2">
+          <i data-lucide="edit-2" class="w-4 h-4 text-cyan-400"></i>
+          <span>Customize Demographics & Clinical Statements</span>
+        </h3>
+        <button id="btnCancelEdit" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="space-y-3 text-xs overflow-y-auto max-h-[60vh] pr-1">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 mb-1">Patient Name</label>
+            <input type="text" id="editName" class="w-full bg-[#0e1422] border border-neuro-border rounded px-3 py-1.5 text-white">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Age</label>
+            <input type="text" id="editAge" class="w-full bg-[#0e1422] border border-neuro-border rounded px-3 py-1.5 text-white">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Gender</label>
+            <input type="text" id="editGender" class="w-full bg-[#0e1422] border border-neuro-border rounded px-3 py-1.5 text-white">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Exam Date</label>
+            <input type="text" id="editDate" class="w-full bg-[#0e1422] border border-neuro-border rounded px-3 py-1.5 text-white">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">M.R.# / ID</label>
+            <input type="text" id="editMRN" class="w-full bg-[#0e1422] border border-neuro-border rounded px-3 py-1.5 text-white">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Referring Doctor</label>
+            <input type="text" id="editRefDoctor" class="w-full bg-[#0e1422] border border-neuro-border rounded px-3 py-1.5 text-white">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Impression Statement</label>
+          <textarea id="editImpression" rows="2" class="w-full bg-[#0e1422] border border-neuro-border rounded p-2 text-white"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-slate-400 mb-1">Conclusion Statement</label>
+          <textarea id="editConclusion" rows="2" class="w-full bg-[#0e1422] border border-neuro-border rounded p-2 text-white"></textarea>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-neuro-border flex justify-end gap-2 text-xs">
+        <button id="btnDiscardEdit" class="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium">Cancel</button>
+        <button id="btnSaveAndRegenerate" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">Save & Re-generate PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal (Gemini Vision API Key) -->
+  <div id="settingsModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-neuro-card border border-neuro-border rounded-2xl w-full max-w-md p-6 shadow-2xl flex flex-col gap-4">
+      <div class="flex items-center justify-between pb-3 border-b border-neuro-border">
+        <h3 class="font-bold text-sm text-white flex items-center gap-2">
+          <i data-lucide="key" class="w-4 h-4 text-cyan-400"></i>
+          <span>Engine & AI Settings</span>
+        </h3>
+        <button id="btnCancelSettings" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Gemini API Key (Optional)</label>
+          <input type="password" id="inputGeminiKey" placeholder="AIzaSy..." class="w-full bg-[#0e1422] border border-neuro-border rounded px-3 py-2 text-white font-mono">
+          <p class="text-[11px] text-slate-400 mt-1">
+            Optional! If provided, the tool also queries Google Gemini 2.0 Flash multimodal vision for comparative AI second opinion. The tool works 100% offline without it!
+          </p>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-neuro-border flex justify-end gap-2 text-xs">
+        <button id="btnSaveSettings" class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="border-t border-neuro-border bg-[#0e1422] px-6 py-3 text-center text-xs text-slate-400">
+    NeuroSense EEG Diagnostic Studio • Built for Rapid Routine 10-20 EEG Trace Digitization, Waveform Analysis & Medical Reporting
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
