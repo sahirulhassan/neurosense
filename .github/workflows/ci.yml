@@ -1,0 +1,48 @@
+name: NeuroSense CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test:
+    name: Test Diagnostic Pipeline & 1-Page PDF
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Run End-to-End Diagnostic CLI Analysis
+        run: uv run python eeg_cli.py analyze src.jpg
+
+      - name: Verify Strict 1-Page PDF Compliance
+        shell: bash
+        run: |
+          uv run python -c "
+          import glob, pypdf
+          pdf_files = glob.glob('reports/*.pdf')
+          assert len(pdf_files) > 0, 'No PDF report generated'
+          reader = pypdf.PdfReader(pdf_files[0])
+          print(f'Verified PDF page count: {len(reader.pages)}')
+          assert len(reader.pages) == 1, f'ReportLab PDF failed 1-page constraint: {len(reader.pages)} pages'
+          "

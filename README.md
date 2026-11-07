@@ -1,8 +1,33 @@
 # NeuroSense — Clinical EEG Diagnostic & Reporting Workstation
 
-An automated clinical neurophysiology tool that analyzes routine 10-20 EEG recording pages (like `src.jpg`), extracts 18-channel continuous traces and Welch spectral features, detects paroxysmal epileptiform discharges, and generates formal clinical interpretations, impressions, and diagnoses matching the reference neurological report (`report.jpg`).
+<p align="left">
+  <a href="https://github.com/sahirulhassan/neurosense/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square&logo=githubactions" alt="Build Status"></a>
+  <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/badge/managed%20by-uv-DE5FE9?style=flat-square&logo=astral" alt="uv package manager"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?style=flat-square&logo=python" alt="Python Versions"></a>
+  <img src="https://img.shields.io/badge/standards-ACNS%2010--20-0f766e?style=flat-square" alt="ACNS Standards">
+  <img src="https://img.shields.io/badge/output-Strict%201--Page%20PDF-be123c?style=flat-square" alt="1-Page PDF">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-informational?style=flat-square" alt="License"></a>
+</p>
 
-Built following **`antislop-ui`** and **`frontend-design`** principles: grounded in authentic neurophysiology clinical aesthetics (Clinical Paper and Telemetry Dark modes), strict 1-page clinical reports, and a native **`uv`-first** workflow.
+An automated clinical neurophysiology tool that analyzes routine 10-20 EEG recording pages (like `src.jpg`), extracts 18-channel continuous traces and Welch spectral features, detects paroxysmal epileptiform discharges, and generates formal clinical interpretations, impressions, and diagnoses matching reference hospital neurological reports (`report.jpg`).
+
+Built on **`antislop-ui`** and **`frontend-design`** principles: grounded in authentic neurophysiology clinical aesthetics (Clinical Paper and Telemetry Dark modes), strict 1-page clinical reports, and a native **`uv`-first** workflow.
+
+---
+
+## Technical Architecture
+
+```mermaid
+flowchart LR
+    A["Raw EEG Scan (src.jpg)"] --> B["Hardware OCR & Calibrations"]
+    B --> C["Centroid Trace Digitization (18 Ch)"]
+    C --> D["Welch Spectral PSD Decomposition"]
+    C --> E["Multi-Channel Burst Detector"]
+    D --> F["ACNS Clinical Rule Knowledge Base"]
+    E --> F
+    F --> G["Strict 1-Page Medical PDF (ReportLab)"]
+    F --> H["Interactive Clinical Workstation (Web UI)"]
+```
 
 ---
 
@@ -60,6 +85,10 @@ uv run python eeg_cli.py serve --port 8080
 
 ```
 neurosense/
+├── .github/
+│   ├── workflows/ci.yml       # GitHub Actions CI matrix (Ubuntu & Windows)
+│   ├── ISSUE_TEMPLATE/        # Structured clinical bug & feature templates
+│   └── pull_request_template.md # PR quality checklist
 ├── pyproject.toml             # uv project specification (PEP 621)
 ├── uv.lock                    # Fast deterministic lockfile
 ├── run.bat / run.ps1          # One-click uv startup scripts
@@ -103,4 +132,8 @@ neurosense/
 
 ---
 
-*Note: Developed as an educational, technical, and neurophysiology exploration project.*
+## Citation & License
+
+If you use NeuroSense in your academic research or clinical engineering projects, please refer to [`CITATION.cff`](CITATION.cff).
+
+Distributed under the [MIT License](LICENSE).

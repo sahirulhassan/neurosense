@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use NeuroSense in your neurophysiology or clinical engineering research, please cite it as below."
+title: "NeuroSense: Clinical EEG Diagnostic Workstation & 1-Page Medical Report Generator"
+version: 0.2.0
+date-released: 2026-11-07
+url: "https://github.com/sahirulhassan/neurosense"
+authors:
+  - family-names: "Hassan"
+    given-names: "Sahirul"
+    email: "sahirulhasan2002@gmail.com"
+keywords:
+  - electroencephalography
+  - clinical neurophysiology
+  - signal processing
+  - welch-psd
+  - epileptiform discharge
+  - acns
+  - reportlab
+  - uv
+license: MIT
