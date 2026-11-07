@@ -44,14 +44,14 @@ def run_windows_ocr(image_path: str) -> str:
 def parse_eeg_metadata(ocr_text: str) -> Dict[str, Any]:
     """Parse key clinical metadata fields from OCR text."""
     meta = {
-        "institution": "Rabia Moon Memorial Institute of Neurosciences",
-        "patient_name": "Aimal Imran",
-        "age": "3 years",
-        "age_years": 3.0,
-        "gender": "Female",
-        "exam_date": "2026-10-30",
-        "mrn": "2026/016228",
-        "exam_id": "EEG20261030002",
+        "institution": "Clinical Neurophysiology Laboratory",
+        "patient_name": "",
+        "age": "",
+        "age_years": 0.0,
+        "gender": "",
+        "exam_date": "",
+        "mrn": "",
+        "exam_id": "",
         "referring_doctor": "Dr. Hira Asif",
         "patient_state": "Sedated asleep",
         "paper_speed": "24.20 mm/s",
@@ -63,6 +63,13 @@ def parse_eeg_metadata(ocr_text: str) -> Dict[str, Any]:
     
     if not ocr_text:
         return meta
+
+    # Optional institution detection
+    inst_m = re.search(r"([A-Za-z\s\(\)]+(?:Institute|Hospital|Neurosciences|Clinic|Center|Laboratory)[A-Za-z\s\(\)]*)", ocr_text, re.IGNORECASE)
+    if inst_m:
+        cand = inst_m.group(1).strip()
+        if len(cand) > 8 and len(cand) < 60:
+            meta["institution"] = cand.strip()
 
     # Name
     name_m = re.search(r"Name\s*[:\-]?\s*([a-zA-Z\s]+?)(?=\s+(?:Main|Sex|Age|Examine|Report|\d|1\.6|$))", ocr_text, re.IGNORECASE)

@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +35,10 @@ app.add_middleware(
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 REPORTS_DIR.mkdir(exist_ok=True)
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)
 
 class UpdateReportRequest(BaseModel):
     metadata: Dict[str, Any]

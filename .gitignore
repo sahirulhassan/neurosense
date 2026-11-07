@@ -241,3 +241,30 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+### NeuroSense Clinical EEG Artifacts
+# Temporary clinical reports and intermediate snippets
+reports/*.pdf
+reports/snippet_*.jpg
+reports/temp_*.jpg
+!reports/.gitkeep
+
+# Uploads staging
+uploads/*
+!uploads/.gitkeep
+
+# QA Screenshots
+tests/screenshots/*.png
+!tests/screenshots/.gitkeep
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Server run logs and pid files
+server.log
+server_error.log
+server.pid
+
+
+

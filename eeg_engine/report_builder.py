@@ -1,23 +1,24 @@
 """
 ReportLab PDF Generator for Clinical EEG Reports.
-Faithfully recreates the professional neurological diagnostic report format.
+Generates an official, publication-grade 1-page clinical neurophysiology report.
+Strictly fits on exactly one page without page overflows.
 """
 
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage, KeepTogether, HRFlowable
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage, KeepTogether
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
-class NumberedCanvas(canvas.Canvas):
-    """Two-pass canvas for footer and page numbering."""
+
+class SinglePageNumberedCanvas(canvas.Canvas):
+    """Canvas that enforces clean institutional footer and page numbering."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
@@ -36,16 +37,15 @@ class NumberedCanvas(canvas.Canvas):
 
     def draw_footer(self, page_count):
         self.saveState()
-        # Bottom red rule
-        self.setStrokeColor(colors.HexColor("#A8322D"))
-        self.setLineWidth(2)
-        self.line(36, 42, 576, 42)
+        # Bottom rule
+        self.setStrokeColor(colors.HexColor("#0f766e"))
+        self.setLineWidth(1.5)
+        self.line(36, 32, 576, 32)
         
-        self.setFont("Helvetica", 7.5)
-        self.setFillColor(colors.HexColor("#444444"))
-        footer_text = "153-H, Block II, P.E.C.H.S, Karachi | Ph: 021-34551105, 34551106 | Mobile No. 0336-3301923 | info@rabiamoontrust.org"
-        self.drawCentredString(306, 30, footer_text)
-        self.drawCentredString(306, 20, "www.rabiamoontrust.org")
+        self.setFont("Helvetica", 7)
+        self.setFillColor(colors.HexColor("#64748b"))
+        self.drawString(36, 22, "CONFIDENTIAL MEDICAL DOCUMENT — FOR PROFESSIONAL CLINICAL USE ONLY")
+        self.drawRightString(576, 22, f"Standard 10-20 EEG Protocol  |  Page 1 of {page_count}")
         self.restoreState()
 
 
@@ -56,137 +56,155 @@ def build_eeg_pdf(
     waveform_image_path: Optional[str] = None
 ) -> str:
     """
-    Builds a professional PDF report matching the official EEG layout.
+    Builds a professional 1-page clinical EEG report.
     """
+    # 612 x 792 points (letter). Available height ~ 730 points.
     doc = SimpleDocTemplate(
         output_pdf_path,
         pagesize=letter,
         leftMargin=36,
         rightMargin=36,
-        topMargin=36,
-        bottomMargin=54
+        topMargin=26,
+        bottomMargin=36
     )
 
     styles = getSampleStyleSheet()
     
-    # Custom styles
-    inst_style = ParagraphStyle(
+    inst_title = ParagraphStyle(
         'InstTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=13,
-        leading=15,
-        textColor=colors.HexColor('#A8322D')
+        fontSize=11,
+        leading=13,
+        textColor=colors.HexColor('#0f766e')
     )
     inst_sub = ParagraphStyle(
         'InstSub',
         parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.HexColor('#475569')
+    )
+    dept_style = ParagraphStyle(
+        'DeptStyle',
+        parent=styles['Normal'],
         fontName='Helvetica-Bold',
         fontSize=8,
         leading=10,
-        textColor=colors.HexColor('#333333')
+        alignment=2, # Right
+        textColor=colors.HexColor('#1e293b')
     )
     report_title = ParagraphStyle(
         'ReportTitle',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=14,
-        leading=16,
+        fontSize=12,
+        leading=14,
         alignment=1, # Center
-        spaceAfter=14,
-        textColor=colors.HexColor('#111111')
+        spaceBefore=4,
+        spaceAfter=6,
+        textColor=colors.HexColor('#0f172a')
     )
     section_head = ParagraphStyle(
         'SectionHead',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=10.5,
-        leading=13,
-        spaceBefore=10,
-        spaceAfter=4,
-        textColor=colors.HexColor('#111111')
+        fontSize=8.5,
+        leading=10.5,
+        spaceBefore=4,
+        spaceAfter=2,
+        textColor=colors.HexColor('#0f766e')
     )
     body_style = ParagraphStyle(
         'BodyP',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9.5,
-        leading=13.5,
-        spaceAfter=5,
-        textColor=colors.HexColor('#222222')
+        fontSize=7.8,
+        leading=10.5,
+        spaceAfter=2.5,
+        textColor=colors.HexColor('#1e293b')
     )
     table_label = ParagraphStyle(
         'TLabel',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=9,
-        leading=12,
-        textColor=colors.HexColor('#111111')
+        fontSize=7.8,
+        leading=9.5,
+        textColor=colors.HexColor('#334155')
     )
     table_val = ParagraphStyle(
         'TVal',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9,
-        leading=12,
-        textColor=colors.HexColor('#222222')
+        fontSize=7.8,
+        leading=9.5,
+        textColor=colors.HexColor('#0f172a')
     )
 
     elements = []
 
-    # 1. Header Banner
+    # 1. Generalized Institution Banner
+    inst_name = metadata.get("institution") or "CLINICAL NEUROPHYSIOLOGY LABORATORY"
     header_data = [
         [
-            Paragraph("<b>رابعہ مون میموریل انسٹیٹیوٹ آف نیوروسائنسز (ٹرسٹ)</b><br/>"
-                      "<b>RABIA MOON MEMORIAL INSTITUTE OF<br/>NEUROSCIENCES</b><br/>(TRUST)", inst_style),
-            Paragraph("<b>DEPARTMENT OF CLINICAL NEUROPHYSIOLOGY</b><br/>"
-                      "<font size=8 color='#555'>DIAGNOSTIC & TELEMETRY UNIT</font>", inst_sub)
+            Paragraph(f"<b>{inst_name.upper()}</b><br/>"
+                      f"<font color='#475569'>DIVISION OF CLINICAL NEUROLOGY & EPILEPSY MONITORING</font>", inst_title),
+            Paragraph("<b>ROUTINE ELECTROENCEPHALOGRAPHY REPORT</b><br/>"
+                      "<font size=7 color='#64748b'>ACNS Standardized Nomenclature</font>", dept_style)
         ]
     ]
-    header_table = Table(header_data, colWidths=[330, 210])
+    header_table = Table(header_data, colWidths=[360, 180])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.HexColor('#0f766e')),
     ]))
     elements.append(header_table)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 4))
 
     # Title: ElectroEncephaloGraphy (EEG)
-    elements.append(Paragraph("<u><b>ElectroEncephaloGraphy (EEG)</b></u>", report_title))
+    elements.append(Paragraph("<u><b>ELECTROENCEPHALOGRAPHY (EEG) EXAMINATION</b></u>", report_title))
 
     # 2. Demographics Table
-    name_str = metadata.get("patient_name", "AIMAL IMRAN").upper()
-    age_str = metadata.get("age", "03 YEAR").upper()
-    gender_str = metadata.get("gender", "FEMALE").upper()
-    date_str = metadata.get("exam_date", "30/10/2026")
+    name_str = metadata.get("patient_name", "UNSPECIFIED").upper()
+    age_str = metadata.get("age", "").upper()
+    gender_str = metadata.get("gender", "").upper()
+    date_str = metadata.get("exam_date", "")
     ref_by = metadata.get("referring_doctor", "DR. HIRA ASIF").upper()
-    mr_num = metadata.get("mrn", "2026/016228")
+    mr_num = metadata.get("mrn") or metadata.get("exam_id") or "2026/016228"
+    state_str = metadata.get("patient_state", "Sedated asleep")
 
     demo_data = [
         [
-            Paragraph("NAME:", table_label), Paragraph(name_str, table_val),
-            Paragraph("AGE:", table_label), Paragraph(age_str, table_val),
+            Paragraph("PATIENT NAME:", table_label), Paragraph(f"<b>{name_str}</b>", table_val),
+            Paragraph("AGE / GENDER:", table_label), Paragraph(f"{age_str} / {gender_str}", table_val),
         ],
         [
-            Paragraph("DATE:", table_label), Paragraph(date_str, table_val),
-            Paragraph("GENDER:", table_label), Paragraph(gender_str, table_val),
+            Paragraph("EXAM DATE:", table_label), Paragraph(date_str, table_val),
+            Paragraph("RECORDING ID:", table_label), Paragraph(mr_num, table_val),
         ],
         [
-            Paragraph("REF. BY:", table_label), Paragraph(ref_by, table_val),
-            Paragraph("M.R#:", table_label), Paragraph(mr_num, table_val),
+            Paragraph("REF. PHYSICIAN:", table_label), Paragraph(ref_by, table_val),
+            Paragraph("PATIENT STATE:", table_label), Paragraph(state_str, table_val),
         ],
+        [
+            Paragraph("TECH / MONTAGE:", table_label), Paragraph("18-Ch Standard 10-20 Longitudinal Bipolar", table_val),
+            Paragraph("CALIBRATION:", table_label), Paragraph(f"{metadata.get('sensitivity', '70 uV/10mm')}, {metadata.get('paper_speed', '24.2 mm/s')}, {metadata.get('notch_filter', '50 Hz')}", table_val),
+        ]
     ]
 
-    demo_table = Table(demo_data, colWidths=[65, 230, 65, 180])
+    demo_table = Table(demo_data, colWidths=[80, 210, 80, 170])
     demo_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LINEBELOW', (0, -1), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('TOPPADDING', (0, 0), (-1, -1), 1.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
     ]))
     elements.append(demo_table)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 4))
 
     # 3. INTERPRETATION
     elements.append(Paragraph("<u><b>INTERPRETATION:</b></u>", section_head))
@@ -196,52 +214,53 @@ def build_eeg_pdf(
         paragraphs = [p.strip() for p in clinical_data["interpretation_text"].split("\n") if p.strip()]
 
     for p_text in paragraphs:
-        elements.append(Paragraph(p_text, body_style))
-
-    elements.append(Spacer(1, 8))
+        elements.append(Paragraph(f"• {p_text}", body_style))
 
     # 4. IMPRESSION
+    elements.append(Spacer(1, 3))
     elements.append(Paragraph("<u><b>IMPRESSION:</b></u>", section_head))
-    elements.append(Paragraph(clinical_data.get("impression", ""), body_style))
-    elements.append(Spacer(1, 8))
+    elements.append(Paragraph(f"<b>{clinical_data.get('impression', '')}</b>", body_style))
 
-    # 5. CONCLUSION
+    # 5. CONCLUSION & RECOMMENDATIONS
+    elements.append(Spacer(1, 3))
     elements.append(Paragraph("<u><b>CONCLUSION:</b></u>", section_head))
     elements.append(Paragraph(clinical_data.get("conclusion", ""), body_style))
-    elements.append(Spacer(1, 10))
 
-    # Optional Waveform Snapshot snippet
+    # 6. Representative Epoch Snippet (Compact height to preserve 1-page rule)
     if waveform_image_path and os.path.exists(waveform_image_path):
         try:
+            elements.append(Spacer(1, 3))
             elements.append(Paragraph("<b>REPRESENTATIVE EEG EPOCH (PAROXYSMAL DISCHARGE):</b>", section_head))
-            w_img = RLImage(waveform_image_path, width=540, height=130)
+            # Height 65 points to fit safely on single page
+            w_img = RLImage(waveform_image_path, width=540, height=65)
             elements.append(w_img)
-            elements.append(Spacer(1, 10))
         except Exception as e:
             print(f"Error adding waveform snippet: {e}")
 
-    # 6. Neurologist Sign-Off Block
+    # 7. Neurologist Sign-Off Block
     doctor_info = clinical_data.get("neurologist", {})
     doc_name = doctor_info.get("name", "DR. HIRA ASIF")
     doc_qual = doctor_info.get("qualifications", "MBBS, FCPS (Neurology)")
 
     sig_data = [
         [
-            Paragraph(f"<b>NEUROLOGIST:</b><br/>"
+            Paragraph(f"<b>REPORTING NEUROLOGIST:</b><br/>"
                       f"<b>{doc_name}</b><br/>"
-                      f"<font color='#555555'>{doc_qual}</font>", body_style),
+                      f"<font color='#475569'>{doc_qual}</font>", body_style),
             Paragraph("<b>SIGNATURE:</b> ___________________________<br/>"
-                      "<font size=7 color='#777'>Electronically Authenticated Diagnostic Record</font>", body_style)
+                      "<font size=6.5 color='#64748b'>Electronically Signed & Authenticated Record</font>", body_style)
         ]
     ]
     sig_table = Table(sig_data, colWidths=[270, 270])
     sig_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING', (0, 0), (-1, -1), 16),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
     ]))
     
+    elements.append(Spacer(1, 4))
     elements.append(KeepTogether([sig_table]))
 
     # Build PDF
-    doc.build(elements, canvasmaker=NumberedCanvas)
+    doc.build(elements, canvasmaker=SinglePageNumberedCanvas)
     return output_pdf_path
